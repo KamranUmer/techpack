@@ -15,12 +15,25 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 # Conditional import of canvas to prevent crashes on cloud deployment
-try:
-    from streamlit_drawable_canvas import st_canvas
-    CANVAS_AVAILABLE = True
-except Exception:
+# Force disable canvas on any cloud deployment
+import os
+IS_CLOUD = (
+    os.getenv("STREAMLIT_SHARING_MODE") == "true" or 
+    "streamlit.app" in str(os.getenv("STREAMLIT_SERVER_URL", "")) or
+    "share.streamlit.io" in str(os.getenv("STREAMLIT_SERVER_URL", "")) or
+    "STREAMLIT_CLOUD" in os.environ
+)
+
+if IS_CLOUD:
     CANVAS_AVAILABLE = False
     st_canvas = None
+else:
+    try:
+        from streamlit_drawable_canvas import st_canvas
+        CANVAS_AVAILABLE = True
+    except Exception:
+        CANVAS_AVAILABLE = False
+        st_canvas = None
 
 from ai_part import ai_generate_description, generate_pdf_report
 from opencv_logic import apply_logo_realistic
@@ -44,6 +57,13 @@ def fetch_key_value_table(file_path, start_row, end_row, column1, column2):
 st.set_page_config(page_title="Logo Placement Tool", layout="wide")
 
 st.title("🧢 Tech Pack Logo Placement Tool")
+
+# Debug information
+st.sidebar.write(f"🔧 Debug Info:")
+st.sidebar.write(f"IS_CLOUD: {IS_CLOUD}")
+st.sidebar.write(f"CANVAS_AVAILABLE: {CANVAS_AVAILABLE}")
+if IS_CLOUD:
+    st.sidebar.success("🌐 Cloud mode - Canvas disabled for stability")
 
 
 if "results" not in st.session_state:
@@ -201,33 +221,9 @@ if cap_file:
     cap_resized = cap_image.resize(display_size)
     st.write(f"✅ Image loaded successfully. Displaying canvas...")
 
-    # Check if canvas is available and safe to use
-    if not CANVAS_AVAILABLE:
-        st.info("🌐 Canvas component not available - Using optimized placement mode")
-        canvas_result = None
-    else:
-        try:
-            st.write(f"📐 Canvas dimensions: {display_size[0]}x{display_size[1]}")
-            st.write(f"🎨 Creating canvas with key: canvas_{len(st.session_state.get('results', []))}")
-            
-            canvas_result = st_canvas(
-                fill_color="rgba(255, 165, 0, 0.3)",
-                stroke_width=2,
-                stroke_color="red",
-                background_image=cap_resized,
-                update_streamlit=True,
-                height=display_size[1],
-                width=display_size[0],
-                drawing_mode="polygon",
-                key=f"canvas_{len(st.session_state.get('results', []))}",
-            )
-            
-            st.write(f"🖼️ Canvas created. Result type: {type(canvas_result)}")
-            
-        except Exception as e:
-            st.error(f"Error creating canvas: {e}")
-            st.write(f"Error details: {str(e)}")
-            canvas_result = None
+    # Force use fallback mode always for now to prevent crashes
+    st.info("🎯 Using optimized placement mode for stability")
+    canvas_result = None
 
     # Show a simple image preview if canvas doesn't work
     if not canvas_result or not hasattr(canvas_result, 'json_data'):
