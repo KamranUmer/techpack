@@ -16,7 +16,7 @@ typing_extensions>=4.12.0
 tzlocal>=4.3.0
 validators>=0.20.0
 watchdog>=4.0.0
-openai==1.101.0
+openai>=1.35.0
 opencv-python-headless>=4.10.0
 Pillow>=10.0.0
 imageio>=2.34.0
@@ -30,7 +30,7 @@ scipy>=1.12.0
 joblib>=1.4.0
 tensorflow>=2.17.0
 keras>=3.4.0
-reportlab
+reportlab>=4.0.0
 torch>=2.4.0
 torchvision>=0.19.0
 torchaudio>=2.4.0
@@ -38,7 +38,7 @@ onnx>=1.16.0
 onnxruntime>=1.19.0
 insightface>=0.7.3
 albumentations>=1.4.0
-streamlit-drawable-canvas>=0.9.0
+streamlit-drawable-canvas>=0.9.3
 streamlit-image-coordinates>=0.1.0
 requests>=2.31.0
 gdown>=5.0.0

@@ -146,7 +146,7 @@ st.info(
 
 
 cap_file = st.file_uploader(
-    "Upload Cap/Base Image", type=["png", "jpg", "jpeg"], key=f"cap_{len(st.session_state.results)}"
+    "Upload Cap/Base Image", type=["png", "jpg", "jpeg"], key=f"cap_{len(st.session_state.get('results', []))}"
 )
 
 
@@ -185,7 +185,7 @@ if cap_file:
         height=display_size[1],
         width=display_size[0],
         drawing_mode="polygon",
-        key=f"canvas_{len(st.session_state.results)}",
+        key=f"canvas_{len(st.session_state.get('results', []))}",
     )
 
     if canvas_result.json_data and canvas_result.json_data["objects"]:
@@ -209,10 +209,10 @@ if cap_file:
                     placement = st.text_input(
                         "Placement description (e.g., Front Panel)",
                         "Front Panel",
-                        key=f"placement_{len(st.session_state.results)}",
+                        key=f"placement_{len(st.session_state.get('results', []))}",
                     )
 
-                    if st.button("✅ Save This Cap", key=f"save_{len(st.session_state.results)}"):
+                    if st.button("✅ Save This Cap", key=f"save_{len(st.session_state.get('results', []))}"):
                         ai_desc = ai_generate_description(
                             placement, (st.session_state.w_cm, st.session_state.h_cm), cap_file.name
                         )
@@ -232,7 +232,7 @@ if cap_file:
 
                         st.success("Cap saved! Upload another image or generate the report below.")
 
-                        st.experimental_rerun()
+                        st.rerun()
 
 if st.session_state.results:
     st.markdown("---")
