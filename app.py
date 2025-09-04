@@ -195,44 +195,80 @@ if cap_file:
     cap_resized = cap_image.resize(display_size)
     st.write(f"✅ Image loaded successfully. Displaying canvas...")
 
-    try:
-        st.write(f"📐 Canvas dimensions: {display_size[0]}x{display_size[1]}")
-        st.write(f"🎨 Creating canvas with key: canvas_{len(st.session_state.get('results', []))}")
-        
-        canvas_result = st_canvas(
-            fill_color="rgba(255, 165, 0, 0.3)",
-            stroke_width=2,
-            stroke_color="red",
-            background_image=cap_resized,
-            update_streamlit=True,
-            height=display_size[1],
-            width=display_size[0],
-            drawing_mode="polygon",
-            key=f"canvas_{len(st.session_state.get('results', []))}",
-        )
-        
-        st.write(f"🖼️ Canvas created. Result type: {type(canvas_result)}")
-        
-        if canvas_result is None:
-            st.warning("Canvas not rendering properly. Trying fallback method...")
-        
-    except Exception as e:
-        st.error(f"Error creating canvas: {e}")
-        st.write(f"Error details: {str(e)}")
+    # Check if we're running on Streamlit Cloud (where canvas causes crashes)
+    is_cloud_deployment = os.getenv("STREAMLIT_SHARING_MODE") == "true" or "share.streamlit.io" in str(os.getenv("STREAMLIT_SERVER_URL", ""))
+    
+    if is_cloud_deployment:
+        st.info("🌐 Running on Streamlit Cloud - Using optimized mode without canvas to prevent crashes")
         canvas_result = None
+    else:
+        try:
+            st.write(f"📐 Canvas dimensions: {display_size[0]}x{display_size[1]}")
+            st.write(f"🎨 Creating canvas with key: canvas_{len(st.session_state.get('results', []))}")
+            
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 165, 0, 0.3)",
+                stroke_width=2,
+                stroke_color="red",
+                background_image=cap_resized,
+                update_streamlit=True,
+                height=display_size[1],
+                width=display_size[0],
+                drawing_mode="polygon",
+                key=f"canvas_{len(st.session_state.get('results', []))}",
+            )
+            
+            st.write(f"🖼️ Canvas created. Result type: {type(canvas_result)}")
+            
+        except Exception as e:
+            st.error(f"Error creating canvas: {e}")
+            st.write(f"Error details: {str(e)}")
+            canvas_result = None
 
     # Show a simple image preview if canvas doesn't work
     if not canvas_result or not hasattr(canvas_result, 'json_data'):
         st.image(cap_resized, caption="Cap Image Preview")
-        st.warning("⚠️ Interactive canvas not available. This might be due to cloud environment limitations.")
-        st.info("💡 For now, you can continue with a default logo placement. Canvas functionality works locally.")
+        if is_cloud_deployment:
+            st.info("🌐 Cloud-optimized mode: Choose a logo placement option below")
+        else:
+            st.warning("⚠️ Interactive canvas not available. Using alternative placement method.")
         
-        # Simple fallback: place logo in center
-        if st.button("📍 Place Logo in Center (Fallback)", key=f"fallback_{len(st.session_state.get('results', []))}"):
+        # Enhanced fallback with multiple placement options
+        st.subheader("📍 Choose Logo Placement")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        placement_choice = None
+        
+        with col1:
+            if st.button("🎯 Center", key=f"center_{len(st.session_state.get('results', []))}"):
+                placement_choice = "center"
+        
+        with col2:
+            if st.button("⬆️ Top Center", key=f"top_{len(st.session_state.get('results', []))}"):
+                placement_choice = "top"
+                
+        with col3:
+            if st.button("⬇️ Bottom Center", key=f"bottom_{len(st.session_state.get('results', []))}"):
+                placement_choice = "bottom"
+        
+        # Logo size selector
+        logo_size_percent = st.slider("Logo Size (% of image)", min_value=10, max_value=50, value=25, key=f"size_{len(st.session_state.get('results', []))}")
+        
+        if placement_choice and st.session_state.logo_path:
             img_height, img_width = cap_image.height, cap_image.width
-            # Default to center placement
-            center_x, center_y = img_width // 2, img_height // 2
-            logo_size = min(img_width, img_height) // 4  # 1/4 of image size
+            logo_size = min(img_width, img_height) * (logo_size_percent / 100)
+            
+            # Calculate placement positions
+            if placement_choice == "center":
+                center_x, center_y = img_width // 2, img_height // 2
+                placement_desc = "Center"
+            elif placement_choice == "top":
+                center_x, center_y = img_width // 2, img_height // 4
+                placement_desc = "Top Center"
+            elif placement_choice == "bottom":
+                center_x, center_y = img_width // 2, img_height * 3 // 4
+                placement_desc = "Bottom Center"
             
             dest_points = [
                 (center_x - logo_size//2, center_y - logo_size//2),  # top-left
@@ -241,24 +277,55 @@ if cap_file:
                 (center_x - logo_size//2, center_y + logo_size//2),  # bottom-left
             ]
             
-            if st.session_state.logo_path:
-                st.write("🔄 Applying logo with fallback method...")
-                # Continue with logo application logic
-                try:
-                    cap_path = os.path.join("uploads", cap_filename) if 'cap_path' in locals() else f"temp_{cap_filename}"
-                    if not os.path.exists(cap_path):
-                        os.makedirs("uploads", exist_ok=True)
-                        cap_image.save(cap_path)
+            st.write(f"🔄 Applying logo to {placement_desc.lower()} with {logo_size_percent}% size...")
+            
+            try:
+                # Ensure we have a saved image file for opencv processing
+                cap_path = os.path.join("uploads", cap_filename)
+                if not os.path.exists(cap_path):
+                    os.makedirs("uploads", exist_ok=True)
+                    cap_image.save(cap_path)
+                
+                os.makedirs("output2", exist_ok=True)
+                out_path = os.path.join("output2", os.path.splitext(cap_filename)[0] + "_with_logo.png")
+                applied = apply_logo_realistic(cap_path, st.session_state.logo_path, dest_points, out_path)
+                
+                if applied:
+                    st.image(applied, caption=f"Preview with Logo - {placement_desc}", width=400)
                     
-                    os.makedirs("output2", exist_ok=True)
-                    out_path = os.path.join("output2", os.path.splitext(cap_filename)[0] + "_with_logo.png")
-                    applied = apply_logo_realistic(cap_path, st.session_state.logo_path, dest_points, out_path)
+                    # Add placement description input
+                    placement_input = st.text_input(
+                        "Placement description (e.g., Front Panel)",
+                        placement_desc,
+                        key=f"placement_desc_{len(st.session_state.get('results', []))}",
+                    )
                     
-                    if applied:
-                        st.image(applied, caption="Preview with Logo", width=400)
-                        st.success("✅ Logo applied successfully using fallback method!")
-                except Exception as e:
-                    st.error(f"Error in fallback method: {e}")
+                    if st.button("✅ Save This Cap", key=f"save_fallback_{len(st.session_state.get('results', []))}"):
+                        ai_desc = ai_generate_description(
+                            placement_input, (st.session_state.w_cm, st.session_state.h_cm), cap_file.name
+                        )
+                        
+                        st.session_state.results.append(
+                            {
+                                "image": cap_path,
+                                "logo": st.session_state.logo_path,
+                                "size_cm": (st.session_state.w_cm, st.session_state.h_cm),
+                                "placement": placement_input,
+                                "description": ai_desc,
+                                "orig_width": 600,
+                                "orig_height": 600,
+                                "output": out_path,
+                            }
+                        )
+                        
+                        st.success("✅ Cap saved successfully!")
+                        st.rerun()
+                        
+                else:
+                    st.error("Failed to apply logo. Please try again.")
+                    
+            except Exception as e:
+                st.error(f"Error applying logo: {e}")
         
     elif canvas_result and canvas_result.json_data and canvas_result.json_data["objects"]:
         last_object = canvas_result.json_data["objects"][-1]
