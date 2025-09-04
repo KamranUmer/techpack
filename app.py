@@ -20,9 +20,12 @@ from ai_part import ai_generate_description, generate_pdf_report
 from opencv_logic import apply_logo_realistic
 
 
-@st.cache_data(show_spinner=False)
 def load_image(path):
-    return Image.open(path).convert("RGBA")
+    try:
+        return Image.open(path).convert("RGBA")
+    except Exception as e:
+        st.error(f"Error loading image: {e}")
+        return None
 
 
 def fetch_key_value_table(file_path, start_row, end_row, column1, column2):
@@ -151,22 +154,29 @@ cap_file = st.file_uploader(
 
 
 if cap_file:
-    cap_filename = f"cap_{cap_file.name}"
+    try:
+        st.write(f"🔍 Processing cap file: {cap_file.name}")
+        cap_filename = f"cap_{cap_file.name}"
+        cap_path = os.path.join("uploads", cap_filename)
 
-    cap_path = os.path.join("uploads", cap_filename)
+        if not os.path.exists(cap_path):
+            os.makedirs("uploads", exist_ok=True)
+            cap_image = Image.open(cap_file).convert("RGBA")
 
-    if not os.path.exists(cap_path):
-        os.makedirs("uploads", exist_ok=True)
+            if cap_path.lower().endswith((".jpg", ".jpeg")):
+                cap_image = cap_image.convert("RGB")
 
-        cap_image = Image.open(cap_file).convert("RGBA")
-
-        if cap_path.lower().endswith((".jpg", ".jpeg")):
-            cap_image = cap_image.convert("RGB")
-
-        cap_image.save(cap_path)
-
-    else:
-        cap_image = load_image(cap_path)
+            cap_image.save(cap_path)
+        else:
+            cap_image = load_image(cap_path)
+            
+        if cap_image is None:
+            st.error("Failed to load cap image. Please try uploading again.")
+            st.stop()
+            
+    except Exception as e:
+        st.error(f"Error processing cap image: {e}")
+        st.stop()
 
     max_width = 600
 
@@ -175,20 +185,25 @@ if cap_file:
     display_size = (max_width, int(cap_image.height * scale))
 
     cap_resized = cap_image.resize(display_size)
+    st.write(f"✅ Image loaded successfully. Displaying canvas...")
 
-    canvas_result = st_canvas(
-        fill_color="rgba(255, 165, 0, 0.3)",
-        stroke_width=2,
-        stroke_color="red",
-        background_image=cap_resized,
-        update_streamlit=True,
-        height=display_size[1],
-        width=display_size[0],
-        drawing_mode="polygon",
-        key=f"canvas_{len(st.session_state.get('results', []))}",
-    )
+    try:
+        canvas_result = st_canvas(
+            fill_color="rgba(255, 165, 0, 0.3)",
+            stroke_width=2,
+            stroke_color="red",
+            background_image=cap_resized,
+            update_streamlit=True,
+            height=display_size[1],
+            width=display_size[0],
+            drawing_mode="polygon",
+            key=f"canvas_{len(st.session_state.get('results', []))}",
+        )
+    except Exception as e:
+        st.error(f"Error creating canvas: {e}")
+        canvas_result = None
 
-    if canvas_result.json_data and canvas_result.json_data["objects"]:
+    if canvas_result and canvas_result.json_data and canvas_result.json_data["objects"]:
         last_object = canvas_result.json_data["objects"][-1]
 
         if last_object["type"] == "path" and len(last_object["path"]) == 5:
@@ -197,11 +212,13 @@ if cap_file:
             dest_points = [(p[1] / scale, p[2] / scale) for p in points[:4]]
 
             if st.session_state.logo_path:
-                os.makedirs("output2", exist_ok=True)
-
-                out_path = os.path.join("output2", os.path.splitext(cap_filename)[0] + "_with_logo.png")
-
-                applied = apply_logo_realistic(cap_path, st.session_state.logo_path, dest_points, out_path)
+                try:
+                    os.makedirs("output2", exist_ok=True)
+                    out_path = os.path.join("output2", os.path.splitext(cap_filename)[0] + "_with_logo.png")
+                    applied = apply_logo_realistic(cap_path, st.session_state.logo_path, dest_points, out_path)
+                except Exception as e:
+                    st.error(f"Error applying logo: {e}")
+                    applied = None
 
                 if applied:
                     st.image(applied, caption="Preview", width=400)
