@@ -136,7 +136,7 @@ sortedcontainers==2.4.0
 soupsieve==2.5
 starkbank-ecdsa==2.2.0
 streamlit==1.25.0 
-streamlit-drawable-canvas==0.8.0 
+# streamlit-drawable-canvas==0.8.0  # Disabled due to cloud compatibility issues 
 streamlit-image-coordinates==0.1.1
 sympy==1.12
 tenacity==8.5.0

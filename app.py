@@ -14,7 +14,13 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from streamlit_drawable_canvas import st_canvas
+# Conditional import of canvas to prevent crashes on cloud deployment
+try:
+    from streamlit_drawable_canvas import st_canvas
+    CANVAS_AVAILABLE = True
+except Exception:
+    CANVAS_AVAILABLE = False
+    st_canvas = None
 
 from ai_part import ai_generate_description, generate_pdf_report
 from opencv_logic import apply_logo_realistic
@@ -195,11 +201,9 @@ if cap_file:
     cap_resized = cap_image.resize(display_size)
     st.write(f"✅ Image loaded successfully. Displaying canvas...")
 
-    # Check if we're running on Streamlit Cloud (where canvas causes crashes)
-    is_cloud_deployment = os.getenv("STREAMLIT_SHARING_MODE") == "true" or "share.streamlit.io" in str(os.getenv("STREAMLIT_SERVER_URL", ""))
-    
-    if is_cloud_deployment:
-        st.info("🌐 Running on Streamlit Cloud - Using optimized mode without canvas to prevent crashes")
+    # Check if canvas is available and safe to use
+    if not CANVAS_AVAILABLE:
+        st.info("🌐 Canvas component not available - Using optimized placement mode")
         canvas_result = None
     else:
         try:
@@ -228,10 +232,7 @@ if cap_file:
     # Show a simple image preview if canvas doesn't work
     if not canvas_result or not hasattr(canvas_result, 'json_data'):
         st.image(cap_resized, caption="Cap Image Preview")
-        if is_cloud_deployment:
-            st.info("🌐 Cloud-optimized mode: Choose a logo placement option below")
-        else:
-            st.warning("⚠️ Interactive canvas not available. Using alternative placement method.")
+        st.info("🎯 Logo Placement Mode: Choose from the placement options below")
         
         # Enhanced fallback with multiple placement options
         st.subheader("📍 Choose Logo Placement")
